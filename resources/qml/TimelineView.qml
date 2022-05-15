@@ -10,7 +10,7 @@ import "./emoji"
 import "./ui"
 import "./voip"
 import Qt.labs.platform 1.1 as Platform
-import QtQuick 2.9
+import QtQuick 2.15
 import QtQuick.Controls 2.5
 import QtQuick.Layouts 1.3
 import QtQuick.Window 2.13
@@ -46,6 +46,15 @@ Item {
         // height is somewhat arbitrary here... don't set width because width scales w/ height
         height: parent.height / 16
         z: 3
+        opacity: hh.hovered ? 0.3 : 1
+
+        Behavior on opacity {
+            NumberAnimation { duration: 100; }
+        }
+
+        HoverHandler {
+            id: hh
+        }
     }
 
     ColumnLayout {
@@ -173,16 +182,43 @@ Item {
             enabled: false
         }
 
-        MatrixText {
-            text: parent.roomName == "" ? qsTr("No preview available") : parent.roomName
-            font.pixelSize: 24
+        RowLayout {
+            spacing: Nheko.paddingMedium
             Layout.alignment: Qt.AlignHCenter
+
+            MatrixText {
+                text: preview.roomName == "" ? qsTr("No preview available") : preview.roomName
+                font.pixelSize: 24
+            }
+
+            ImageButton {
+                image: ":/icons/icons/ui/settings.svg"
+                visible: !!room
+                hoverEnabled: true
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Settings")
+                onClicked: TimelineManager.openRoomSettings(room.roomId)
+            }
+
         }
 
-        MatrixText {
+        RowLayout {
             visible: !!room
-            text: qsTr("%1 member(s)").arg(room ? room.roomMemberCount : 0)
+            spacing: Nheko.paddingMedium
             Layout.alignment: Qt.AlignHCenter
+
+            MatrixText {
+                text: qsTr("%n member(s)", "", room ? room.roomMemberCount : 0)
+            }
+
+            ImageButton {
+                image: ":/icons/icons/ui/people.svg"
+                hoverEnabled: true
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("View members of %1").arg(room ? room.roomName : "")
+                onClicked: TimelineManager.openRoomMembers(room)
+            }
+
         }
 
         ScrollView {

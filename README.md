@@ -43,6 +43,7 @@ Specifically there is support for:
 - Room switcher (ctrl-K).
 - Light, Dark & System themes.
 - Creating separate profiles (command line only, use `-p name`).
+- D-Bus API to allow integration with third-party plugins (does not support Windows or macOS).
 
 ## Installation
 
@@ -155,6 +156,12 @@ with [Chocolatey](https://chocolatey.org/):
 ```posh
 choco install nheko-reborn
 ```
+
+#### D-Bus plugins
+
+nheko does not provide binaries for any D-Bus plugins. However, we do provide the following list of known plugins:
+
+- [nheko-krunner](https://github.com/LorenDB/nheko-krunner)
 
 ### FAQ
 
@@ -301,7 +308,7 @@ sudo apt install cmake gcc make automake liblmdb-dev \
     qt5-default libssl-dev libqt5multimedia5-plugins libqt5multimediagsttools5 libqt5multimediaquick5 libqt5svg5-dev \
     qml-module-qtgstreamer qtmultimedia5-dev qtquickcontrols2-5-dev qttools5-dev qttools5-dev-tools qtdeclarative5-dev \
     qml-module-qtgraphicaleffects qml-module-qtmultimedia qml-module-qtquick-controls2 qml-module-qtquick-layouts  qml-module-qt-labs-platform\
-    qt5keychain-dev
+    qt5keychain-dev asciidoctor libsecret-1-dev
 ```
 
 ##### Fedora
@@ -409,7 +416,12 @@ Also copy the respective cmark.dll to the binary dir from `build/cmark-build/src
 
 ### Contributing
 
-See [CONTRIBUTING](.github/CONTRIBUTING.md)
+See [CONTRIBUTING](.github/CONTRIBUTING.md).
+
+### Using the D-Bus API
+
+Currently, there is no documentation for the D-Bus API, so if you'd like to make use of it, come ask
+for support in [#nheko:nheko.im](https://matrix.to/#/#nheko:nheko.im).
 
 ### Screens
 

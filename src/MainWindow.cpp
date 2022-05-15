@@ -54,6 +54,10 @@
 #include "ui/UIA.h"
 #include "voip/WebRTCSession.h"
 
+#ifdef NHEKO_DBUS_SYS
+#include "dbus/NhekoDBusApi.h"
+#endif
+
 Q_DECLARE_METATYPE(mtx::events::collections::TimelineEvents)
 Q_DECLARE_METATYPE(std::vector<DeviceInfo>)
 Q_DECLARE_METATYPE(std::vector<mtx::responses::PublicRoomsChunk>)
@@ -282,6 +286,18 @@ MainWindow::registerQmlTypes()
         engine()->addImageProvider(QStringLiteral("jdenticon"), new JdenticonProvider());
 
     QObject::connect(engine(), &QQmlEngine::quit, &QGuiApplication::quit);
+
+#ifdef NHEKO_DBUS_SYS
+    if (UserSettings::instance()->exposeDBusApi()) {
+        if (QDBusConnection::sessionBus().isConnected() &&
+            QDBusConnection::sessionBus().registerService(NHEKO_DBUS_SERVICE_NAME)) {
+            nheko::dbus::init();
+            nhlog::ui()->info("Initialized D-Bus");
+            dbusAvailable_ = true;
+        } else
+            nhlog::ui()->warn("Could not connect to D-Bus!");
+    }
+#endif
 }
 
 void
@@ -417,4 +433,51 @@ MainWindow::showDialog(QWidget *dialog)
     dialog->show();
     utils::centerWidget(dialog, this);
     dialog->window()->windowHandle()->setTransientParent(this);
+}
+
+void
+MainWindow::addPerRoomWindow(const QString &room, QWindow *window)
+{
+    roomWindows_.insert(room, window);
+}
+void
+MainWindow::removePerRoomWindow(const QString &room, QWindow *window)
+{
+    roomWindows_.remove(room, window);
+}
+QWindow *
+MainWindow::windowForRoom(const QString &room)
+{
+    auto currMainWindowRoom = ChatPage::instance()->timelineManager()->rooms()->currentRoom();
+    if ((currMainWindowRoom && currMainWindowRoom->roomId() == room) ||
+        ChatPage::instance()->timelineManager()->rooms()->currentRoomPreview().roomid_ == room)
+        return this;
+    else if (auto res = roomWindows_.find(room); res != roomWindows_.end())
+        return res.value();
+    return nullptr;
+}
+
+QString
+MainWindow::focusedRoom() const
+{
+    auto focus = QGuiApplication::focusWindow();
+    if (!focus)
+        return {};
+
+    if (focus == this) {
+        auto currMainWindowRoom = ChatPage::instance()->timelineManager()->rooms()->currentRoom();
+        if (currMainWindowRoom)
+            return currMainWindowRoom->roomId();
+        else
+            return ChatPage::instance()->timelineManager()->rooms()->currentRoomPreview().roomid_;
+    }
+
+    auto i = roomWindows_.constBegin();
+    while (i != roomWindows_.constEnd()) {
+        if (i.value() == focus)
+            return i.key();
+        ++i;
+    }
+
+    return nullptr;
 }

@@ -303,7 +303,6 @@ check_symbol_exists(backtrace_symbols_fd "execinfo.h" HAVE_BACKTRACE_SYMBOLS_FD)
 
 configure_file(cmake/nheko.h config/nheko.h)
 
-
 #
 # Declare source and header files.
 #
@@ -401,7 +400,7 @@ if(USE_BUNDLED_MTXCLIENT)
 	FetchContent_Declare(
 		MatrixClient
 		GIT_REPOSITORY https://github.com/Nheko-Reborn/mtxclient.git
-		GIT_TAG        288f585725ecdf2e5e04c5985fdbf658a7fe8a1b
+		GIT_TAG        f1250b3f212171cacca791ed585cab53cf34c199
 		)
 	set(BUILD_LIB_EXAMPLES OFF CACHE INTERNAL "")
 	set(BUILD_LIB_TESTS OFF CACHE INTERNAL "")
@@ -419,7 +418,7 @@ if(USE_BUNDLED_OLM)
 	set(OLM_TESTS OFF CACHE INTERNAL "")
 	FetchContent_MakeAvailable(Olm)
 else()
-	find_package(Olm 3 REQUIRED)
+	find_package(Olm 3.2.7 REQUIRED)
 	set_package_properties(Olm PROPERTIES
 		DESCRIPTION "An implementation of the Double Ratchet cryptographic ratchet"
 		URL "https://git.matrix.org/git/olm/about/"
@@ -500,6 +499,11 @@ set(QAPPLICATION_CLASS QApplication CACHE STRING "Inheritance class for SingleAp
 add_subdirectory(third_party/SingleApplication-3.3.2/)
 
 feature_summary(WHAT ALL INCLUDE_QUIET_PACKAGES FATAL_ON_MISSING_REQUIRED_PACKAGES)
+
+# this must be defined here to make the moc work properly
+if (NOT APPLE AND NOT WIN32)
+	add_compile_definitions(NHEKO_DBUS_SYS)
+endif()
 
 qt5_wrap_cpp(MOC_HEADERS
 	# Dialogs
@@ -599,7 +603,15 @@ elseif (WIN32)
 
 	set(SRC_FILES ${SRC_FILES} src/notifications/ManagerWin.cpp src/wintoastlib.cpp)
 else ()
-	set(SRC_FILES ${SRC_FILES} src/notifications/ManagerLinux.cpp)
+	set(SRC_FILES ${SRC_FILES}
+        src/dbus/NhekoDBusApi.cpp
+        src/dbus/NhekoDBusBackend.cpp
+        src/notifications/ManagerLinux.cpp
+	)
+    qt5_wrap_cpp(MOC_HEADERS
+        src/dbus/NhekoDBusApi.h
+        src/dbus/NhekoDBusBackend.h
+	)
 endif ()
 
 set(NHEKO_DEPS
@@ -720,17 +732,27 @@ endif()
 set_target_properties(nheko PROPERTIES CMAKE_SKIP_INSTALL_RPATH TRUE)
 
 if(UNIX AND NOT APPLE)
+	if(FLATPAK)
+		set(APPID "io.github.NhekoReborn.Nheko")
+	else()
+		set(APPID "nheko")
+	endif()
+
 	install (TARGETS nheko RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-	install (FILES "resources/nheko-16.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/16x16/apps" RENAME "nheko.png")
-	install (FILES "resources/nheko-32.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/32x32/apps" RENAME "nheko.png")
-	install (FILES "resources/nheko-48.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/48x48/apps" RENAME "nheko.png")
-	install (FILES "resources/nheko-64.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/64x64/apps" RENAME "nheko.png")
-	install (FILES "resources/nheko-128.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/128x128/apps" RENAME "nheko.png")
-	install (FILES "resources/nheko-256.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps" RENAME "nheko.png")
-	install (FILES "resources/nheko-512.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/512x512/apps" RENAME "nheko.png")
-	install (FILES "resources/nheko.svg" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/scalable/apps" RENAME "nheko.svg")
-	install (FILES "resources/nheko.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
-	install (FILES "resources/nheko.appdata.xml" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/metainfo")
+	install (FILES "resources/nheko-16.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/16x16/apps" RENAME "${APPID}.png")
+	install (FILES "resources/nheko-32.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/32x32/apps" RENAME "${APPID}.png")
+	install (FILES "resources/nheko-48.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/48x48/apps" RENAME "${APPID}.png")
+	install (FILES "resources/nheko-64.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/64x64/apps" RENAME "${APPID}.png")
+	install (FILES "resources/nheko-128.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/128x128/apps" RENAME "${APPID}.png")
+	install (FILES "resources/nheko-256.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps" RENAME "${APPID}.png")
+	install (FILES "resources/nheko-512.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/512x512/apps" RENAME "${APPID}.png")
+	install (FILES "resources/nheko.svg" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/scalable/apps" RENAME "${APPID}.svg")
+	install (FILES "resources/_nheko" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/zsh/site-functions")
+
+	configure_file("resources/nheko.desktop.in" "resources/nheko.desktop" @ONLY)
+	install (FILES "${CMAKE_CURRENT_BINARY_DIR}/resources/nheko.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications" RENAME "${APPID}.desktop")
+	configure_file("resources/nheko.appdata.xml.in" "resources/nheko.appdata.xml" @ONLY)
+	install (FILES "${CMAKE_CURRENT_BINARY_DIR}/resources/nheko.appdata.xml" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/metainfo" RENAME "${APPID}.appdata.xml")
 
 	if(NOT TARGET uninstall)
 		configure_file(

@@ -14,9 +14,11 @@ Item {
     property var timelineRoot
     property int screenTimeout
 
+    required property var windowTarget
+
     Connections {
-        function onFocusChanged() {
-            if (MainWindow.active) {
+        function onActiveChanged() {
+            if (windowTarget.active) {
                 screenSaverTimer.stop();
                 screenSaver.state = "Invisible";
             } else {
@@ -26,14 +28,14 @@ Item {
             }
         }
 
-        target: TimelineManager
+        target: windowTarget
     }
 
     Timer {
         id: screenSaverTimer
 
         interval: screenTimeout * 1000
-        running: !MainWindow.active
+        running: !windowTarget.active
         onTriggered: {
             screenSaver.state = "Visible";
         }

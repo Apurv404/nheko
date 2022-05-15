@@ -15,6 +15,10 @@
 #include "TimelineViewManager.h"
 #include "UserSettingsPage.h"
 
+#ifdef NHEKO_DBUS_SYS
+#include <QDBusConnection>
+#endif
+
 RoomlistModel::RoomlistModel(TimelineViewManager *parent)
   : QAbstractListModel(parent)
   , manager(parent)
@@ -604,6 +608,15 @@ RoomlistModel::initializeRooms()
     nhlog::db()->info("Restored {} rooms from cache", rowCount());
 
     endResetModel();
+
+#ifdef NHEKO_DBUS_SYS
+    if (MainWindow::instance()->dbusAvailable()) {
+        dbusInterface_ = new NhekoDBusBackend{this};
+        if (!QDBusConnection::sessionBus().registerObject(
+              "/", dbusInterface_, QDBusConnection::ExportScriptableSlots))
+            nhlog::ui()->warn("Failed to register rooms with D-Bus");
+    }
+#endif
 }
 
 void
@@ -677,6 +690,34 @@ RoomlistModel::leave(QString roomid, QString reason)
             ChatPage::instance()->leaveRoom(roomid, reason);
         }
     }
+}
+
+RoomPreview
+RoomlistModel::getRoomPreviewById(QString roomid) const
+{
+    RoomPreview preview{};
+
+    if (invites.contains(roomid) || previewedRooms.contains(roomid)) {
+        std::optional<RoomInfo> i;
+        if (invites.contains(roomid)) {
+            i                 = invites.value(roomid);
+            preview.isInvite_ = true;
+        } else {
+            i                 = previewedRooms.value(roomid);
+            preview.isInvite_ = false;
+        }
+
+        if (i) {
+            preview.roomid_        = roomid;
+            preview.roomName_      = QString::fromStdString(i->name);
+            preview.roomTopic_     = QString::fromStdString(i->topic);
+            preview.roomAvatarUrl_ = QString::fromStdString(i->avatar_url);
+        } else {
+            preview.roomid_ = roomid;
+        }
+    }
+
+    return preview;
 }
 
 void

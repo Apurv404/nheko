@@ -138,10 +138,6 @@ TimelineViewManager::TimelineViewManager(CallManager *, ChatPage *parent)
         isInitialSync_ = true;
         emit initialSyncChanged(true);
     });
-    connect(qobject_cast<QApplication *>(QApplication::instance()),
-            &QApplication::focusWindowChanged,
-            this,
-            &TimelineViewManager::focusChanged);
     connect(parent, &ChatPage::connectionLost, this, [this] {
         isConnected_ = false;
         emit isConnectedChanged(false);
@@ -150,12 +146,6 @@ TimelineViewManager::TimelineViewManager(CallManager *, ChatPage *parent)
         isConnected_ = true;
         emit isConnectedChanged(true);
     });
-}
-
-bool
-TimelineViewManager::isWindowFocused() const
-{
-    return MainWindow::instance() == QApplication::focusWindow();
 }
 
 void
@@ -232,7 +222,10 @@ void
 TimelineViewManager::showEvent(const QString &room_id, const QString &event_id)
 {
     if (auto room = rooms_->getRoomById(room_id)) {
-        if (rooms_->currentRoom() != room) {
+        auto exWin = MainWindow::instance()->windowForRoom(room_id);
+        if (exWin) {
+            exWin->requestActivate();
+        } else if (rooms_->currentRoom() != room) {
             rooms_->setCurrentRoom(room_id);
             MainWindow::instance()->requestActivate();
             nhlog::ui()->info("Activated room {}", room_id.toStdString());
@@ -249,13 +242,17 @@ TimelineViewManager::escapeEmoji(QString str) const
 }
 
 void
-TimelineViewManager::openImageOverlay(TimelineModel *room, QString mxcUrl, QString eventId)
+TimelineViewManager::openImageOverlay(TimelineModel *room,
+                                      QString mxcUrl,
+                                      QString eventId,
+                                      double originalWidth,
+                                      double proportionalHeight)
 {
     if (mxcUrl.isEmpty()) {
         return;
     }
 
-    emit showImageOverlay(room, eventId, mxcUrl);
+    emit showImageOverlay(room, eventId, mxcUrl, originalWidth, proportionalHeight);
 }
 
 void

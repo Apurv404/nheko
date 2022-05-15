@@ -72,8 +72,6 @@ public:
 
     mtx::presence::PresenceState currentPresence() const;
 
-    // TODO(Nico): Get rid of this!
-    QString currentRoom() const;
     void startChat(QString userid, std::optional<bool> encryptionEnabled);
 
 public slots:
@@ -94,10 +92,10 @@ public slots:
                      bool promptForConfirmation = true,
                      const QString &reason      = "");
 
-    void inviteUser(QString userid, QString reason);
-    void kickUser(QString userid, QString reason);
-    void banUser(QString userid, QString reason);
-    void unbanUser(QString userid, QString reason);
+    void inviteUser(const QString &room, QString userid, QString reason);
+    void kickUser(const QString &room, QString userid, QString reason);
+    void banUser(const QString &room, QString userid, QString reason);
+    void unbanUser(const QString &room, QString userid, QString reason);
 
     void receivedSessionKey(const std::string &room_id, const std::string &session_id);
     void decryptDownloadedSecrets(mtx::secret_storage::AesHmacSha2KeyDescription keyDesc,
@@ -129,6 +127,7 @@ signals:
     void leftRoom(const QString &room_id);
     void newRoom(const QString &room_id);
     void changeToRoom(const QString &room_id);
+    void startRemoveFallbackKeyTimer();
 
     void initializeViews(const mtx::responses::Sync &rooms);
     void initializeEmptyViews();
@@ -185,7 +184,9 @@ private:
     void tryInitialSync();
     void trySync();
     void verifyOneTimeKeyCountAfterStartup();
-    void ensureOneTimeKeyCount(const std::map<std::string, uint16_t> &counts);
+    void ensureOneTimeKeyCount(const std::map<std::string, uint16_t> &counts,
+                               const std::optional<std::vector<std::string>> &fallback_keys);
+    void removeOldFallbackKey();
     void getProfileInfo();
     void getBackupVersion();
 

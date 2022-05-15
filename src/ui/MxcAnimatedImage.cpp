@@ -70,22 +70,27 @@ MxcAnimatedImage::startDownload()
         if (!self)
             return;
 
-        if (buffer.isOpen()) {
-            movie.stop();
-            movie.setDevice(nullptr);
-            buffer.close();
-        }
+        try {
+            if (buffer.isOpen()) {
+                movie.stop();
+                movie.setDevice(nullptr);
+                buffer.close();
+            }
 
-        if (encryptionInfo) {
-            QByteArray ba = device.readAll();
-            std::string temp(ba.constData(), ba.size());
-            temp = mtx::crypto::to_string(mtx::crypto::decrypt_file(temp, encryptionInfo.value()));
-            buffer.setData(temp.data(), temp.size());
-        } else {
-            buffer.setData(device.readAll());
+            if (encryptionInfo) {
+                QByteArray ba = device.readAll();
+                std::string temp(ba.constData(), ba.size());
+                temp =
+                  mtx::crypto::to_string(mtx::crypto::decrypt_file(temp, encryptionInfo.value()));
+                buffer.setData(temp.data(), temp.size());
+            } else {
+                buffer.setData(device.readAll());
+            }
+            buffer.open(QIODevice::ReadOnly);
+            buffer.reset();
+        } catch (const std::exception &e) {
+            nhlog::net()->error("Failed to setup animated image buffer: {}", e.what());
         }
-        buffer.open(QIODevice::ReadOnly);
-        buffer.reset();
 
         QTimer::singleShot(0, this, [this, mimeType] {
             nhlog::ui()->info(
@@ -153,8 +158,13 @@ MxcAnimatedImage::geometryChanged(const QRectF &newGeometry, const QRectF &oldGe
     QQuickItem::geometryChanged(newGeometry, oldGeometry);
 
     if (newGeometry.size() != oldGeometry.size()) {
-        if (height() != 0 && width() != 0)
-            movie.setScaledSize(newGeometry.size().toSize());
+        if (height() != 0 && width() != 0) {
+            QSizeF r = movie.scaledSize();
+            r.scale(newGeometry.size(), Qt::KeepAspectRatio);
+            movie.setScaledSize(r.toSize());
+            imageDirty = true;
+            update();
+        }
     }
 }
 
@@ -174,7 +184,6 @@ MxcAnimatedImage::updatePaintNode(QSGNode *oldNode, QQuickItem::UpdatePaintNodeD
         n->setFlags(QSGNode::OwnedByParent);
     }
 
-    // n->setTexture(nullptr);
     auto img = movie.currentImage();
     n->setSourceRect(img.rect());
     if (!img.isNull())
@@ -184,7 +193,10 @@ MxcAnimatedImage::updatePaintNode(QSGNode *oldNode, QQuickItem::UpdatePaintNodeD
         return nullptr;
     }
 
-    n->setRect(0, 0, width(), height());
+    QSizeF r = img.size();
+    r.scale(size(), Qt::KeepAspectRatio);
+
+    n->setRect((width() - r.width()) / 2, (height() - r.height()) / 2, r.width(), r.height());
     n->setFiltering(QSGTexture::Linear);
     n->setMipmapFiltering(QSGTexture::None);
 

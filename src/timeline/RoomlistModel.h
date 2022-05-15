@@ -8,6 +8,7 @@
 #include <CacheStructs.h>
 #include <QAbstractListModel>
 #include <QHash>
+#include <QQmlEngine>
 #include <QSharedPointer>
 #include <QSortFilterProxyModel>
 #include <QString>
@@ -16,6 +17,10 @@
 #include <mtx/responses/sync.hpp>
 
 #include "TimelineModel.h"
+
+#ifdef NHEKO_DBUS_SYS
+#include "dbus/NhekoDBusBackend.h"
+#endif
 
 class TimelineViewManager;
 
@@ -85,6 +90,7 @@ public:
         else
             return {};
     }
+    RoomPreview getRoomPreviewById(QString roomid) const;
 
 public slots:
     void initializeRooms();
@@ -138,6 +144,11 @@ private:
 
     std::map<QString, std::vector<QString>> directChatToUser;
 
+#ifdef NHEKO_DBUS_SYS
+    NhekoDBusBackend *dbusInterface_;
+    friend class NhekoDBusBackend;
+#endif
+
     friend class FilteredRoomlistModel;
 };
 
@@ -174,7 +185,13 @@ public slots:
     void resetCurrentRoom() { roomlistmodel->resetCurrentRoom(); }
     TimelineModel *getRoomById(const QString &id) const
     {
-        return roomlistmodel->getRoomById(id).data();
+        auto r = roomlistmodel->getRoomById(id).data();
+        QQmlEngine::setObjectOwnership(r, QQmlEngine::CppOwnership);
+        return r;
+    }
+    RoomPreview getRoomPreviewById(QString roomid) const
+    {
+        return roomlistmodel->getRoomPreviewById(roomid);
     }
 
     void nextRoomWithActivity();

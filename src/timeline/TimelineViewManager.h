@@ -41,7 +41,6 @@ class TimelineViewManager : public QObject
 
     Q_PROPERTY(
       bool isInitialSync MEMBER isInitialSync_ READ isInitialSync NOTIFY initialSyncChanged)
-    Q_PROPERTY(bool isWindowFocused READ isWindowFocused NOTIFY focusChanged)
     Q_PROPERTY(bool isConnected READ isConnected NOTIFY isConnectedChanged)
 
 public:
@@ -54,9 +53,12 @@ public:
     void clearAll() { rooms_->clear(); }
 
     Q_INVOKABLE bool isInitialSync() const { return isInitialSync_; }
-    bool isWindowFocused() const;
     bool isConnected() const { return isConnected_; }
-    Q_INVOKABLE void openImageOverlay(TimelineModel *room, QString mxcUrl, QString eventId);
+    Q_INVOKABLE void openImageOverlay(TimelineModel *room,
+                                      QString mxcUrl,
+                                      QString eventId,
+                                      double originalWidth,
+                                      double proportionalHeight);
     Q_INVOKABLE void openImagePackSettings(QString roomid);
     Q_INVOKABLE void saveMedia(QString mxcUrl);
     Q_INVOKABLE QColor userColor(QString id, QColor background);
@@ -82,7 +84,6 @@ signals:
     void inviteUsers(QString roomId, QStringList users);
     void showRoomList();
     void narrowViewChanged();
-    void focusChanged();
     void focusInput();
     void openRoomMembersDialog(MemberList *members, TimelineModel *room);
     void openRoomSettingsDialog(RoomSettings *settings);
@@ -90,7 +91,11 @@ signals:
     void openProfile(UserProfile *profile);
     void showImagePackSettings(TimelineModel *room, ImagePackListModel *packlist);
     void openLeaveRoomDialog(QString roomid, QString reason = "");
-    void showImageOverlay(TimelineModel *room, QString eventId, QString url);
+    void showImageOverlay(TimelineModel *room,
+                          QString eventId,
+                          QString url,
+                          double originalWidth,
+                          double proportionalHeight);
 
 public slots:
     void updateReadReceipts(const QString &room_id, const std::vector<QString> &event_ids);

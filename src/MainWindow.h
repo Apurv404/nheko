@@ -8,6 +8,7 @@
 
 #include <functional>
 
+#include <QHash>
 #include <QQuickView>
 #include <QSharedPointer>
 #include <QSystemTrayIcon>
@@ -54,6 +55,15 @@ public:
     //! Show the chat page and start communicating with the given access token.
     void showChatPage();
 
+#ifdef NHEKO_DBUS_SYS
+    bool dbusAvailable() const { return dbusAvailable_; }
+#endif
+
+    Q_INVOKABLE void addPerRoomWindow(const QString &room, QWindow *window);
+    Q_INVOKABLE void removePerRoomWindow(const QString &room, QWindow *window);
+    QWindow *windowForRoom(const QString &room);
+    QString focusedRoom() const;
+
 protected:
     void closeEvent(QCloseEvent *event);
     bool event(QEvent *event) override;
@@ -96,4 +106,10 @@ private:
     TrayIcon *trayIcon_;
 
     MxcImageProvider *imgProvider = nullptr;
+
+    QMultiHash<QString, QWindow *> roomWindows_;
+
+#ifdef NHEKO_DBUS_SYS
+    bool dbusAvailable_{false};
+#endif
 };

@@ -197,6 +197,12 @@ qml_mtx_events::toRoomEventType(mtx::events::EventType e)
         return qml_mtx_events::EventType::SpaceParent;
     case EventType::SpaceChild:
         return qml_mtx_events::EventType::SpaceChild;
+    case EventType::ImagePackInRoom:
+        return qml_mtx_events::ImagePackInRoom;
+    case EventType::ImagePackInAccountData:
+        return qml_mtx_events::ImagePackInAccountData;
+    case EventType::ImagePackRooms:
+        return qml_mtx_events::ImagePackRooms;
     case EventType::Unsupported:
         return qml_mtx_events::EventType::Unsupported;
     default:
@@ -349,10 +355,12 @@ TimelineModel::TimelineModel(TimelineViewManager *manager, QString room_id, QObj
 {
     lastMessage_.timestamp = 0;
 
-    if (auto create =
-          cache::client()->getStateEvent<mtx::events::state::Create>(room_id_.toStdString()))
-        this->isSpace_ = create->content.type == mtx::events::state::room_type::space;
     this->isEncrypted_ = cache::isRoomEncrypted(room_id_.toStdString());
+
+    auto roomInfo            = cache::singleRoomInfo(room_id_.toStdString());
+    this->isSpace_           = roomInfo.is_space;
+    this->notification_count = roomInfo.notification_count;
+    this->highlight_count    = roomInfo.highlight_count;
 
     // this connection will simplify adding the plainRoomNameChanged() signal everywhere that it
     // needs to be
@@ -1064,7 +1072,8 @@ TimelineModel::setCurrentIndex(int index)
     if (index != oldIndex)
         emit currentIndexChanged(index);
 
-    if (MainWindow::instance() != QGuiApplication::focusWindow())
+    if (!QGuiApplication::focusWindow() || !QGuiApplication::focusWindow()->isActive() ||
+        MainWindow::instance()->windowForRoom(roomId()) != QGuiApplication::focusWindow())
         return;
 
     if (!currentId.startsWith('m')) {
@@ -2199,6 +2208,78 @@ TimelineModel::formatPowerLevelEvent(const QString &id)
     }
 }
 
+QString
+TimelineModel::formatImagePackEvent(const QString &id)
+{
+    mtx::events::collections::TimelineEvents *e = events.get(id.toStdString(), "");
+    if (!e)
+        return {};
+
+    auto event = std::get_if<mtx::events::StateEvent<mtx::events::msc2545::ImagePack>>(e);
+    if (!event)
+        return {};
+
+    mtx::events::StateEvent<mtx::events::msc2545::ImagePack> *prevEvent = nullptr;
+    if (!event->unsigned_data.replaces_state.empty()) {
+        auto tempPrevEvent = events.get(event->unsigned_data.replaces_state, event->event_id);
+        if (tempPrevEvent) {
+            prevEvent =
+              std::get_if<mtx::events::StateEvent<mtx::events::msc2545::ImagePack>>(tempPrevEvent);
+        }
+    }
+
+    const auto &newImages = event->content.images;
+    const auto oldImages  = prevEvent ? prevEvent->content.images : decltype(newImages){};
+
+    auto ascent = QFontMetrics(UserSettings::instance()->font()).ascent();
+
+    auto calcChange = [ascent](const std::map<std::string, mtx::events::msc2545::PackImage> &newI,
+                               const std::map<std::string, mtx::events::msc2545::PackImage> &oldI) {
+        QStringList added;
+        for (const auto &[shortcode, img] : newI) {
+            if (!oldI.count(shortcode))
+                added.push_back(QStringLiteral("<img data-mx-emoticon height=%1 src=\"%2\"> (~%3)")
+                                  .arg(ascent)
+                                  .arg(QString::fromStdString(img.url)
+                                         .replace("mxc://", "image://mxcImage/")
+                                         .toHtmlEscaped(),
+                                       QString::fromStdString(shortcode)));
+        }
+        return added;
+    };
+
+    auto added   = calcChange(newImages, oldImages);
+    auto removed = calcChange(oldImages, newImages);
+
+    auto sender       = utils::replaceEmoji(displayName(QString::fromStdString(event->sender)));
+    const auto packId = [&event]() -> QString {
+        if (!event->content.pack->display_name.empty()) {
+            return event->content.pack->display_name.c_str();
+        } else if (!event->state_key.empty()) {
+            return event->state_key.c_str();
+        }
+        return tr("(empty)");
+    }();
+
+    QString msg;
+
+    if (!removed.isEmpty()) {
+        msg = tr("%1 removed the following images from the pack %2:<br>%3")
+                .arg(sender, packId, removed.join(", "));
+    }
+    if (!added.isEmpty()) {
+        if (!msg.isEmpty())
+            msg += "<br>";
+        msg += tr("%1 added the following images to the pack %2:<br>%3")
+                 .arg(sender, packId, added.join(", "));
+    }
+
+    if (msg.isEmpty())
+        return tr("%1 changed the sticker and emotes in this room.").arg(sender);
+    else
+        return msg;
+}
+
 QVariantMap
 TimelineModel::formatRedactedEvent(const QString &id)
 {
@@ -2258,7 +2339,8 @@ TimelineModel::acceptKnock(const QString &id)
     if (event->content.membership != Membership::Knock)
         return;
 
-    ChatPage::instance()->inviteUser(QString::fromStdString(event->state_key), QLatin1String(""));
+    ChatPage::instance()->inviteUser(
+      room_id_, QString::fromStdString(event->state_key), QLatin1String(""));
 }
 
 bool
